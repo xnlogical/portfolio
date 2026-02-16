@@ -1,0 +1,98 @@
+---
+import Card from "../components/ui/Card.astro";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import TerminalPrompt from "../components/ui/TerminalPrompt.astro";
+import SectionHeading from "../components/ui/SectionHeading.astro";
+import GalleryItem from "../components/GalleryItem.astro";
+
+const gallery: Array<{
+    title: string;
+    description: string;
+    link: string;
+    media?: string;
+    tags?: string[];
+}> = [
+    {
+        title: "Placement system",
+        description: "Rust-like placement system",
+        link: "",
+        media: "port-1.mp4",
+        tags: ["Roblox"],
+    },
+    {
+        title: "Night/thermal vision",
+        description: "NVGs/TVGs for a combat game",
+        link: "",
+        media: "port-2.mp4",
+        tags: ["Roblox"],
+    },
+    {
+        title: "Tank projectile",
+        description: "Animated & functional tank projectiles",
+        link: "",
+        media: "port-3.mp4",
+        tags: ["Roblox"],
+    },
+    {
+        title: "Weapon holster",
+        description: "Simple weapon holstering system",
+        link: "",
+        media: "port-4.mp4",
+        tags: ["Roblox"],
+    },
+    {
+        title: "Proning system",
+        description: "First-person proning",
+        link: "",
+        media: "port-5.mp4",
+        tags: ["Roblox"],
+    },
+    {
+        title: "Tank aiming system",
+        description: "Advanced multi-axial point-to-aim system",
+        link: "",
+        media: "port-6.mp4",
+        tags: ["Roblox"],
+    },
+    {
+        title: "Battleship camera",
+        description: "Top-down ocean camera",
+        link: "",
+        media: "port-7.mp4",
+        tags: ["Roblox"],
+    },
+];
+---
+
+<BaseLayout navbarActiveItemID="home">
+    <main>
+        <section id="about" aria-labelledby="about-heading">
+            <Card role="region">
+                <SectionHeading as="h1">📝 Gallery</SectionHeading>
+                <div
+                    class="bg-gray-200/50 dark:bg-gray-500/10 rounded-lg p-3 mb-4"
+                >
+                    <h1>🖱️ Hover over videos to play</h1>
+                    <h1>⚠️ Refresh page if not loading</h1>
+                </div>
+                <div class="space-y-2" role="list">
+                    {
+                        gallery.map((project, index) => (
+                            <GalleryItem
+                                title={project.title}
+                                description={project.description}
+                                link={project.link}
+                                media={project.media}
+                                tags={project.tags}
+                                index={index}
+                            />
+                        ))
+                    }
+                </div>
+                <TerminalPrompt
+                    command={`ls -la gallery/ | total ${gallery.length}`}
+                />
+            </Card>
+        </section>
+    </main>
+</BaseLayout>

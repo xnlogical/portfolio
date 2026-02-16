@@ -1,0 +1,133 @@
+---
+import Card from "../components/ui/Card.astro";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import TerminalPrompt from "../components/ui/TerminalPrompt.astro";
+import SectionHeading from "../components/ui/SectionHeading.astro";
+import TermsItem from "../components/TermsItem.astro";
+
+const terms: Array<{
+    title: string;
+    open?: boolean;
+    children: string[];
+}> = [
+    {
+        title: "Preamble",
+        open: true,
+        children: [
+            "A) By requesting a commission, you agree to the terms below.",
+            "B) All commissions are implicitly or explicitly governed by the terms below.",
+        ],
+    },
+    {
+        title: "Right to Deny Service",
+        open: false,
+        children: [
+            "A) I reserve the right to refuse service to any individual or entity at my discretion.",
+            "B) Reasons for refusal may be disclosed or undisclosed.",
+            "C) This applies at any stage of communication or commission.",
+        ],
+    },
+    {
+        title: "Agreement & Work Scope",
+        open: false,
+        children: [
+            "A) The terms of a commission may not be changed unilaterally after work has begun.",
+            "B) Any changes must be mutually agreed upon by both parties.",
+            "C) Additional requests outside the original scope may be treated as a new commission.",
+        ],
+    },
+    {
+        title: "Communication and Conduct",
+        open: false,
+        children: [
+            "A) Communication must remain respectful and professional at all times.",
+            "B) Harassment, hate speech, discrimination, or abusive behavior will not be tolerated.",
+            "C) Violations may result in immediate termination of service.",
+        ],
+    },
+    {
+        title: "Payment Terms",
+        open: false,
+        children: [
+            "A) Payment terms will be agreed upon before work begins.",
+            "B) Failure to meet payment obligations may result in suspension or termination of the commission.",
+            "C) I am not responsible for delays caused by late or missing payments.",
+        ],
+    },
+    {
+        title: "Refund & Revision Policy",
+        open: false,
+        children: [
+            "A) All commissions are considered final once work has begun.",
+            "B) Refunds and revisions are not offered unless explicitly agreed upon in advance.",
+        ],
+    },
+    {
+        title: "Delivery & Timelines",
+        open: false,
+        children: [
+            "A) Delivery timelines are estimates unless explicitly stated otherwise.",
+            "B) Delays may occur due to workload, technical complexity, or external factors.",
+            "C) Significant delays will be communicated when possible.",
+        ],
+    },
+    {
+        title: "Ownership & Usage",
+        open: false,
+        children: [
+            "A) Upon completion and payment, you may use the delivered work for its intended purpose.",
+            "B) I may showcase the work in portfolios or public examples unless confidentiality is requested in advance.",
+            "C) Material from the commission will never be used for any purpose other than B) unless explicitly permitted.",
+        ],
+    },
+    {
+        title: "Termination Policy",
+        open: false,
+        children: [
+            "A) I shall terminate a commission at my own discretion if these terms are violated.",
+            "B) You may cancel before work begins.",
+        ],
+    },
+    {
+        title: "No Guarantees",
+        open: false,
+        children: [
+            "A) I offer no guarantees regarding performance, results, or business outcomes.",
+            "B) You are solely responsible for how the delivered work is used.",
+        ],
+    },
+    {
+        title: "Changes to These Terms",
+        open: false,
+        children: [
+            "A) These terms may be updated at any time for future commissions.",
+            "B) Ongoing commissions are governed by the terms agreed upon at the start, unless both parties agree to changes.",
+        ],
+    },
+];
+---
+
+<BaseLayout navbarActiveItemID="home">
+    <main>
+        <section id="about" aria-labelledby="about-heading">
+            <Card role="region">
+                <SectionHeading as="h1">📝 Terms of Service</SectionHeading>
+                <div class="space-y-2" role="list">
+                    {
+                        terms.map((term, index) => (
+                            <TermsItem
+                                title={term.title}
+                                children={term.children}
+                                open={term.open}
+                                index={index}
+                            />
+                        ))
+                    }
+                </div>
+                <TerminalPrompt
+                    command={`ls -la tos/ | total ${terms.length}`}
+                />
+            </Card>
+        </section>
+    </main>
+</BaseLayout>

@@ -1,0 +1,568 @@
+---
+
+---
+
+<div class="fixed inset-0 -z-10 w-full h-full">
+    <canvas id="circuit-canvas" class="w-full h-full" transition:persist=""
+    ></canvas>
+    <script type="module" is:inline>
+        const cellSize = 10;
+        const wireLengthMin = 16;
+        const wireLength = 80;
+        const straightness = 0.375;
+        const icWidth = 21;
+        const icSatellites = 5;
+        const radialBias = 1;
+        const randomStarts = 0.1;
+
+        function generate() {
+            const dirs = [
+                [-1, -1],
+                [0, -1],
+                [1, -1],
+                [1, 0],
+                [1, 1],
+                [0, 1],
+                [-1, 1],
+                [-1, 0],
+            ];
+
+            // ---- State ----
+            let grid = [];
+            let gridWidth = 0;
+            let gridHeight = 0;
+            let available = [];
+            let wires = [];
+            let icIndex = 0;
+            let prio = [];
+            let inner = [];
+
+            // ---- Helper math funcs ----
+            function shuffle(arr) {
+                let i = arr.length,
+                    j,
+                    temp;
+                while (--i > 0) {
+                    j = Math.floor(Math.random() * (i + 1));
+                    temp = arr[j];
+                    arr[j] = arr[i];
+                    arr[i] = temp;
+                }
+            }
+
+            function sortDirsByKey(allowed, f) {
+                const indices = allowed.map((i) => [f(dirs[i]), i]);
+                indices.sort((a, b) => a[0] - b[0]);
+                return indices.map((x) => x[1]);
+            }
+
+            function dotP(a, b) {
+                return a[0] * b[0] + a[1] * b[1];
+            }
+
+            function vLen(v) {
+                return Math.sqrt(v[0] * v[0] + v[1] * v[1]);
+            }
+
+            function vNormalized(v) {
+                const len = Math.sqrt(v[0] * v[0] + v[1] * v[1]);
+                if (len === 0) return v;
+                return [v[0] / len, v[1] / len];
+            }
+
+            function getRadialBiasKey(center, position, invert) {
+                const dx = position[0] - center[0];
+                const dy = position[1] - center[1];
+                const n = vNormalized([dx, dy]);
+                const c = invert ? 1 : -1;
+                return (dir) =>
+                    (1.0 - radialBias) * Math.random() +
+                    radialBias * c * dotP(vNormalized(dir), n);
+            }
+
+            function getStraightnessKey(currentIndex) {
+                const currentDir = dirs[currentIndex];
+                return (dir) =>
+                    (1.0 - straightness) * Math.random() +
+                    straightness *
+                        vLen([dir[0] - currentDir[0], dir[1] - currentDir[1]]);
+            }
+
+            function getBiasedKey(center, position, currentIndex, invert) {
+                const radial = getRadialBiasKey(center, position, invert);
+                const sness = getStraightnessKey(currentIndex);
+                return (dir) => (radial(dir) + sness(dir)) * 0.5;
+            }
+
+            // ---- Classes ----
+            class IC {
+                constructor(x, y, w, h, satellite) {
+                    this.x0 = x;
+                    this.x1 = x + w - 1;
+                    this.y0 = y;
+                    this.y1 = y + h - 1;
+                    this.index = icIndex++;
+                    this.satellite = satellite;
+                }
+
+                isCPUFacing(i, j) {
+                    const center = [
+                        Math.floor(gridWidth / 2),
+                        Math.floor(gridHeight / 2),
+                    ];
+                    if (i == this.x1 && i < center[0]) return true;
+                    if (i == this.x0 && i > center[0]) return true;
+                    if (j == this.y1 && j < center[1]) return true;
+                    if (j == this.y0 && j > center[1]) return true;
+                    return false;
+                }
+
+                overlaps(ic1) {
+                    return (
+                        !(this.x1 < ic1.x0 || ic1.x1 < this.x0) &&
+                        !(this.y1 < ic1.y0 || ic1.y1 < this.y0)
+                    );
+                }
+
+                isEven(i, j) {
+                    return (i - this.x0) % 2 === 0 && (j - this.y0) % 2 === 0;
+                }
+
+                isEdge(i, j) {
+                    return (
+                        ((i == this.x0 || i == this.x1) &&
+                            j >= this.y0 &&
+                            j <= this.y1) ||
+                        ((j == this.y0 || j == this.y1) &&
+                            i >= this.x0 &&
+                            i <= this.x1)
+                    );
+                }
+
+                isInner(i, j) {
+                    return (
+                        i > this.x0 && i < this.x1 && j > this.y0 && j < this.y1
+                    );
+                }
+            }
+
+            class Cell {
+                available = true;
+                icPin = false;
+                icIndex = 0;
+                icInner = false;
+                consumed = false;
+                icSatellite = false;
+                icCPUFacing = false;
+                constructor(x, y) {
+                    this.x = x;
+                    this.y = y;
+                }
+            }
+
+            class Wire {
+                cells = [];
+                last = 0;
+                icPin = false;
+                icIndex = 0;
+                icInner = false;
+                icSatellite = false;
+                icCPUFacing = false;
+                filled = false;
+                brightness = 0;
+
+                constructor(start, center) {
+                    this.cells.push(start);
+                    this.last = findOpenDir(center, start);
+                    this.icPin = start.icPin;
+                    this.icIndex = start.icIndex;
+                    this.icInner = start.icInner;
+                    this.icSatellite = start.icSatellite;
+                    this.icCPUFacing = start.icCPUFacing;
+                    if (this.icSatellite) {
+                        this.filled = true;
+                    } else if (this.icInner) {
+                        this.filled = Math.random() > 0.1;
+                    } else {
+                        this.filled = Math.random() > 0.5;
+                    }
+
+                    this.brightness = Math.floor(
+                        (1.0 - Math.pow(Math.random(), 2.0)) * 90 + 10,
+                    );
+                }
+
+                generate(center) {
+                    let hasSpace = true;
+                    let wireLength_ = Math.floor(
+                        Math.random() * (wireLength - wireLengthMin) +
+                            wireLengthMin,
+                    );
+                    if (this.icInner && this.icSatellite) wireLength_ = 1;
+                    else if (this.icInner && Math.random() > 0.3)
+                        wireLength_ = 2;
+                    if (this.icInner && Math.random() > 0.6) return;
+
+                    while (this.cells.length < wireLength_ && hasSpace) {
+                        const prevCell = this.cells[this.cells.length - 1];
+                        let tries = [0, 1, -1];
+                        if (Math.random() > 0.5) tries = [0, -1, 1];
+                        if (this.icInner && this.cells.length === 1)
+                            tries = [0];
+                        let found = false;
+                        hasSpace = false;
+
+                        tries = tries.map((t) => {
+                            let index = this.last + t;
+                            if (index < 0) index += 8;
+                            if (index > 7) index -= 8;
+                            return index;
+                        });
+
+                        if (!(this.icInner && this.cells.length === 1)) {
+                            tries = sortDirsByKey(
+                                tries,
+                                getBiasedKey(
+                                    center,
+                                    [prevCell.x, prevCell.y],
+                                    this.last,
+                                    this.icCPUFacing,
+                                ),
+                            );
+                        }
+
+                        for (const index of tries) {
+                            const dir = dirs[index];
+                            const x = dir[0] + prevCell.x;
+                            const y = dir[1] + prevCell.y;
+                            if (
+                                x >= 0 &&
+                                x < gridWidth - 1 &&
+                                y >= 0 &&
+                                y < gridHeight - 1
+                            ) {
+                                const cell = grid[x][y];
+                                if (
+                                    cell.available ||
+                                    (this.icPin &&
+                                        cell.icPin &&
+                                        this.icIndex !== cell.icIndex &&
+                                        !cell.consumed) ||
+                                    (this.icInner &&
+                                        cell.icPin &&
+                                        this.icIndex === cell.icIndex &&
+                                        !cell.consumed)
+                                ) {
+                                    if (
+                                        noCrossOver(index, x, y) ||
+                                        (this.icInner &&
+                                            this.cells.length === 1)
+                                    ) {
+                                        this.cells.push(cell);
+                                        cell.available = false;
+                                        cell.consumed = true;
+                                        hasSpace = found = true;
+                                        this.last = index;
+                                        if (cell.icPin && !this.icInner) return;
+                                    }
+                                }
+                            }
+                            if (found) break;
+                        }
+                    }
+                }
+            }
+
+            // ---- Utility functions used by classes ----
+            function noCrossOver(index, x, y) {
+                // matches original logic
+                if (index === 0)
+                    return grid[x + 1][y].available || grid[x][y + 1].available;
+                if (index === 2)
+                    return grid[x - 1][y].available || grid[x][y + 1].available;
+                if (index === 4)
+                    return grid[x - 1][y].available || grid[x][y - 1].available;
+                if (index === 6)
+                    return grid[x + 1][y].available || grid[x][y - 1].available;
+                return true;
+            }
+
+            function findOpenDir(center, start, invertRadialBias) {
+                let checks = [0, 1, 2, 3, 4, 5, 6, 7];
+                if (start.icInner) {
+                    checks = [0, 2, 4, 6];
+                } else if (start.icPin) {
+                    checks = [1, 3, 5, 7];
+                }
+                checks = sortDirsByKey(
+                    checks,
+                    getRadialBiasKey(
+                        center,
+                        [start.x, start.y],
+                        invertRadialBias ?? false,
+                    ),
+                );
+                for (const index of checks) {
+                    const dir = dirs[index];
+                    const x2 = start.x + dir[0];
+                    const y2 = start.y + dir[1];
+                    if (
+                        x2 >= 0 &&
+                        x2 < gridWidth - 1 &&
+                        y2 >= 0 &&
+                        y2 < gridHeight - 1
+                    ) {
+                        const cell = grid[x2][y2];
+                        if (
+                            cell.available ||
+                            (cell.icInner && start.icInner && !cell.consumed)
+                        ) {
+                            return index;
+                        }
+                    }
+                }
+                return 0;
+            }
+
+            function randomICDimension() {
+                const min = Math.floor(icWidth / 4);
+                const max = icWidth;
+                let d = Math.floor(Math.random() * (max - min) + min);
+                if (d % 2 !== 1) d -= 1;
+                return d;
+            }
+
+            function generateIC() {
+                const w = randomICDimension();
+                const h = randomICDimension();
+                const x = Math.floor(2 + Math.random() * (gridWidth - w - 4));
+                const y = Math.floor(2 + Math.random() * (gridHeight - h - 4));
+                return new IC(x, y, w, h, true);
+            }
+
+            gridWidth = Math.ceil(window.innerWidth / cellSize) + 1;
+            gridHeight = Math.ceil(window.innerHeight / cellSize) + 1;
+
+            grid = [];
+            available = [];
+            wires = [];
+            prio = [];
+            inner = [];
+
+            const x0raw = Math.floor(gridWidth / 2 - icWidth / 2);
+            const y0raw = Math.floor(gridHeight / 2 - icWidth / 2);
+            let x0 = x0raw - (x0raw % 2);
+            let y0 = y0raw - (y0raw % 2);
+            const center = [
+                Math.floor(gridWidth / 2),
+                Math.floor(gridHeight / 2),
+            ];
+
+            const ics = [new IC(x0, y0, icWidth, icWidth, false)];
+
+            for (let k = 0; k < icSatellites; k++) {
+                for (let attempt = 0; attempt < 4; attempt++) {
+                    let overlap = false;
+                    const ic = generateIC();
+                    for (const ic1 of ics) {
+                        if (ic.overlaps(ic1)) {
+                            overlap = true;
+                            break;
+                        }
+                    }
+                    if (!overlap) {
+                        ics.push(ic);
+                        break;
+                    }
+                }
+            }
+
+            for (let i = 0; i < gridWidth; i++) {
+                grid.push([]);
+                for (let j = 0; j < gridHeight; j++) {
+                    const cell = new Cell(i, j);
+                    grid[i][j] = cell;
+                    for (const ic of ics) {
+                        if (ic.isEdge(i, j)) {
+                            const isEven = ic.isEven(i, j);
+                            cell.available = false;
+                            cell.icPin = true;
+                            cell.icIndex = ic.index;
+                            cell.icSatellite = ic.satellite;
+                            cell.icCPUFacing = ic.isCPUFacing(i, j);
+                            if (isEven || (ic.satellite && Math.random() > 0.3))
+                                prio.push(cell);
+                        } else if (ic.isInner(i, j)) {
+                            const isEven = ic.isEven(i, j);
+                            cell.available = false;
+                            cell.icSatellite = ic.satellite;
+                            cell.icPin = true;
+                            cell.icIndex = ic.index;
+                            cell.icInner = true;
+                            if (
+                                (isEven || ic.satellite) &&
+                                (!ic.satellite || Math.random() > 0.3)
+                            )
+                                inner.push(cell);
+                        }
+                    }
+                    const isEven_ = i % 2 === 0 && j % 2 === 0;
+                    if (
+                        cell.available &&
+                        isEven_ &&
+                        Math.random() < randomStarts
+                    ) {
+                        available.push(cell);
+                    }
+                }
+            }
+
+            function genFromCell(cell) {
+                cell.available = false;
+                const wire = new Wire(cell, center);
+                wire.generate(center);
+                wires.push(wire);
+                for (let i = 0; i < wire.cells.length; i++) {
+                    const av_ix = available.indexOf(wire.cells[i]);
+                    if (av_ix >= 0) available.splice(av_ix, 1);
+                }
+            }
+
+            for (const cell of prio) {
+                if (!cell.consumed) genFromCell(cell);
+            }
+
+            while (available.length > 0) {
+                const cell =
+                    available[Math.floor(Math.random() * available.length)];
+                genFromCell(cell);
+            }
+
+            shuffle(inner);
+            for (const cell of inner) {
+                if (!cell.consumed) genFromCell(cell);
+            }
+
+            return wires;
+        }
+
+        function hexToRgb(hex) {
+            hex = hex.trim();
+            if (!hex.startsWith("#")) return { r: 255, g: 255, b: 255 };
+
+            const n = parseInt(hex.slice(1), 16);
+            return {
+                r: (n >> 16) & 255,
+                g: (n >> 8) & 255,
+                b: n & 255,
+            };
+        }
+
+        function lerp(a, b, t) {
+            return a + (b - a) * t;
+        }
+
+        function lerpColor(a, b, t) {
+            return {
+                r: lerp(a.r, b.r, t),
+                g: lerp(a.g, b.g, t),
+                b: lerp(a.b, b.b, t),
+            };
+        }
+
+        const canvas = document.getElementById("circuit-canvas");
+        const ctx = canvas.getContext("2d");
+
+        let wires = generate(cellSize);
+        let animationId;
+        let surfaceRGB;
+
+        function updateThemeColors() {
+            const styles = getComputedStyle(document.body);
+            surfaceRGB = hexToRgb(styles.getPropertyValue("--color-surface"));
+            console.log(surfaceRGB);
+        }
+
+        updateThemeColors();
+
+        window.addEventListener("theme-change", (e) => {
+            updateThemeColors();
+            console.log("Theme changed to:", e.detail.theme);
+        });
+
+        wires.forEach((w) => {
+            w.brightness = Math.floor((1 - Math.random() ** 2) * 80 + 20) * 0.4;
+        });
+
+        function resize() {
+            canvas.width = innerWidth;
+            canvas.height = innerHeight;
+        }
+
+        function drawCircuit() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            wires.forEach((wire) => {
+                const c = surfaceRGB;
+                const color = `rgb(${c.r}, ${c.g}, ${c.b})`;
+
+                ctx.strokeStyle = color;
+                ctx.beginPath();
+
+                for (let i = 0; i < wire.cells.length; i++) {
+                    const ccell = wire.cells[i];
+                    const x = (ccell.x + 0.5) * cellSize;
+                    const y = (ccell.y + 0.5) * cellSize;
+                    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+                }
+
+                ctx.lineWidth = cellSize / 3;
+                ctx.stroke();
+
+                const first = wire.cells[0];
+                const last = wire.cells[wire.cells.length - 1];
+                const rad1 = (wire.filled ? 0.3 : 0.4) * cellSize;
+                const rad2 = wire.icSatellite ? 0.3 * cellSize : rad1;
+
+                ctx.beginPath();
+                ctx.arc(
+                    (first.x + 0.5) * cellSize,
+                    (first.y + 0.5) * cellSize,
+                    rad1,
+                    0,
+                    Math.PI * 2,
+                );
+                ctx.arc(
+                    (last.x + 0.5) * cellSize,
+                    (last.y + 0.5) * cellSize,
+                    rad2,
+                    0,
+                    Math.PI * 2,
+                );
+                ctx.fillStyle = color;
+                ctx.fill();
+            });
+        }
+
+        function animate() {
+            drawCircuit();
+
+            wires.forEach((w) => (w.brightness *= 0.975));
+            animationId = requestAnimationFrame(animate);
+        }
+
+        function init() {
+            window.addEventListener("resize", resize);
+            document.addEventListener("astro:before-swap", () => {
+                window.removeEventListener("resize", resize);
+                cancelAnimationFrame(animationId);
+            });
+
+            resize();
+            animate();
+        }
+
+        init();
+        document.addEventListener("astro:after-swap", init);
+    </script>
+</div>

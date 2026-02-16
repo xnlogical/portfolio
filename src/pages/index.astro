@@ -1,0 +1,192 @@
+---
+import { getCollection } from "astro:content";
+import SocialMediaIcons from "../components/SocialMediaIcons.astro";
+import ProjectItem from "../components/ProjectItem.astro";
+import Card from "../components/ui/Card.astro";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { sortMDByDate } from "../utils";
+import TerminalHeader from "../components/ui/TerminalHeader.astro";
+import TerminalPrompt from "../components/ui/TerminalPrompt.astro";
+import InfoRow from "../components/ui/InfoRow.astro";
+import ExternalLink from "../components/ui/ExternalLink.astro";
+import SectionHeading from "../components/ui/SectionHeading.astro";
+import Divider from "../components/ui/Divider.astro";
+import PostList from "../components/ui/PostList.astro";
+
+const MAX_POSTS = 10;
+const allPosts = await getCollection("blog");
+const allPostsByDate = sortMDByDate(allPosts).slice(0, MAX_POSTS);
+
+const projects: Array<{
+    title: string;
+    description: string;
+    link: string;
+    icon: string;
+    tags: string[];
+    banner?: string;
+}> = [
+    {
+        title: "via",
+        description:
+            "a modern scripting language designed for correctness, performance, and scalability",
+        link: "https://github.com/via-lang/via",
+        icon: "⭐",
+        tags: ["rust", "cargo", "PL"],
+    },
+    {
+        title: "argvx",
+        description: "minimal argument parser for C++23",
+        icon: "💻",
+        link: "https://github.com/xnlogical/argvx",
+        tags: ["C++", "CMake", "CLI"],
+    },
+    {
+        title: "SIRF",
+        description: "simple intermediate representation format",
+        icon: "🌊",
+        link: "",
+        tags: ["rust", "cargo", "PL"],
+    },
+    {
+        title: "Thugs vs Police",
+        description: "simple & chaotic FPS game made in 9 days",
+        icon: "",
+        link: "https://www.roblox.com/games/89186215794284/Thugs-vs-Police",
+        tags: ["roblox", "full game"],
+        banner: "https://tr.rbxcdn.com/180DAY-0ad3b7755d937d8cadbdbf38b1461431/768/432/Image/Webp/noFilter",
+    },
+    {
+        title: "UFO Race",
+        description: "self explanatory",
+        icon: "",
+        link: "https://www.roblox.com/games/117834676933040/UFO-Race",
+        tags: ["roblox", "full game"],
+        banner: "https://tr.rbxcdn.com/180DAY-1a64db5894d44af4e6c0dcaacdd6e91e/768/432/Image/Png/noFilter",
+    },
+    {
+        title: "Toilet Vanguard",
+        description: "uhm.. yeah",
+        icon: "",
+        link: "https://www.roblox.com/games/18649337822/Toilet-Vanguard",
+        tags: ["roblox", "full game"],
+        banner: "https://tr.rbxcdn.com/180DAY-d0df428671161dd0ff2e30ac6bd3d234/768/432/Image/Webp/noFilter",
+    },
+];
+---
+
+<BaseLayout navbarActiveItemID="home">
+    <main>
+        <section id="about" aria-labelledby="about-heading">
+            <Card role="region">
+                <TerminalHeader title="terminal - ssh guest@terminus" />
+
+                <!-- Content -->
+                <div class="text-s">
+                    <div class="space-y-4 sm:space-y-2">
+                        <div class="flex items-center gap-3 mb-4">
+                            <div class="flex flex-col gap-1">
+                                <h1 class="text-2xl">
+                                    🪴 hi, I'm <span
+                                        class="text-primary font-medium"
+                                        >xnlogical</span
+                                    >
+                                </h1>
+                                <p class="text-muted text-xs">
+                                    systems programmer and freelance game
+                                    developer
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Personal paragraph -->
+                        <div
+                            class="bg-gray-200/50 dark:bg-gray-500/10 rounded-lg p-3 mb-4"
+                        >
+                            <p class="text-primary leading-relaxed"></p>
+                        </div>
+
+                        <Divider class="mb-2" />
+
+                        <InfoRow label="location">Turkey 🇹🇷</InfoRow>
+
+                        <InfoRow label="main hobby">
+                            programming (obviously)
+                        </InfoRow>
+
+                        <InfoRow label="current project">
+                            <ExternalLink
+                                href="https://github.com/via-lang/via"
+                                label=""
+                            >
+                                the via programming language
+                            </ExternalLink>
+                        </InfoRow>
+
+                        <InfoRow label="main interests">
+                            linux, compilers, interpreters, PL design, game
+                            engines, open source
+                        </InfoRow>
+
+                        <InfoRow label="contact">
+                            <a
+                                class="text-accent hover:underline focus:outline-none"
+                                href="mailto:xnlogical@gmail.com"
+                                aria-label="Send email to site author"
+                                >xnlogical on discord <br /> xnlogical [at] gmail
+                                (dot) com
+                            </a>
+                        </InfoRow>
+
+                        <InfoRow label="social">
+                            <SocialMediaIcons />
+                        </InfoRow>
+                    </div>
+                </div>
+
+                <TerminalPrompt command="cat about.txt" />
+            </Card>
+        </section>
+
+        <section id="projects" class="mt-2">
+            <Card
+                class="text-secondary"
+                role="region"
+                aria-label="Project showcase"
+            >
+                <SectionHeading>my projects</SectionHeading>
+                <div class="space-y-2" role="list">
+                    {
+                        projects.map((project, index) => (
+                            <ProjectItem
+                                title={project.title}
+                                description={project.description}
+                                link={project.link}
+                                icon={project.icon}
+                                tags={project.tags}
+                                banner={project.banner}
+                                index={index}
+                            />
+                        ))
+                    }
+                </div>
+                <TerminalPrompt
+                    command={`ls -la projects/ | total ${projects.length}`}
+                />
+            </Card>
+        </section>
+
+        {
+            allPosts.length > 0 && (
+                <section id="blog" class="mt-2">
+                    <Card>
+                        <SectionHeading>✍️ latest posts</SectionHeading>
+                        <PostList posts={allPostsByDate} />
+                        <TerminalPrompt
+                            command={`tail -n ${allPostsByDate.length} blog/`}
+                        />
+                    </Card>
+                </section>
+            )
+        }
+    </main>
+</BaseLayout>

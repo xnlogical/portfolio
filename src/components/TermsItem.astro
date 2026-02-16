@@ -1,0 +1,42 @@
+---
+interface Props {
+    title: string;
+    index?: number;
+    open?: boolean;
+    children: string[]; // REQUIRED: list of paragraphs / bullets
+}
+
+const { title, index, open = false, children } = Astro.props;
+const number = index !== undefined ? String(index + 1).padStart(2, "0") : null;
+---
+
+<details
+    class="group border border-gray-300/60 dark:border-gray-800/80 rounded transition-colors overflow-hidden bg-white/40 dark:bg-gray-950/40"
+    {...open ? { open: true } : {}}
+>
+    <summary
+        class="cursor-pointer select-none flex items-center gap-2 p-3 hover:bg-gray-200/50 dark:hover:bg-gray-900/40 transition-colors"
+    >
+        {
+            number && (
+                <span class="text-muted w-8 shrink-0 font-mono">{number}.</span>
+            )
+        }
+
+        <span class="font-semibold text-secondary group-hover:text-accent">
+            {title}
+        </span>
+
+        <span
+            class="ml-auto text-muted group-open:rotate-90 transition-transform"
+        >
+            ▶
+        </span>
+    </summary>
+
+    <article
+        class="p-4 text-sm text-muted leading-relaxed border-t border-gray-300/40 dark:border-gray-800/60 space-y-2"
+    >
+        {children.map((line) => <ul>{line}</ul>)}
+    </article>
+</details>

@@ -1,0 +1,75 @@
+---
+interface Props {
+    title: string;
+    description: string;
+    link: string;
+    media?: string;
+    tags?: string[];
+    index: number;
+}
+
+const { title, description, link, media, tags = [] } = Astro.props;
+const base = import.meta.env.BASE_URL;
+---
+
+<a
+    href={link}
+    target="_blank"
+    rel="noopener noreferrer"
+    class="group block rounded-xl overflow-hidden bg-gray-200/50 dark:bg-gray-900/40 hover:scale-[1.01] transition-transform"
+>
+    <div class="relative aspect-video w-full overflow-hidden">
+        {
+            media ? (
+                <>
+                    {media.endsWith(".mp4") || media.endsWith(".webm") ? (
+                        <video
+                            src={`${base}${media}`}
+                            class="w-full h-full object-cover"
+                            muted
+                            loop
+                            playsinline
+                            preload="metadata"
+                            poster={`${base}${media.replace(/\.(mp4|webm)$/, ".jpg")}`}
+                        />
+                    ) : (
+                        <img
+                            src={`${base}${media}`}
+                            alt={title}
+                            class="w-full h-full object-cover"
+                            loading="lazy"
+                        />
+                    )}
+                </>
+            ) : null
+        }
+
+        <div
+            class="absolute bottom-0 left-0 w-full p-4 bg-gradient-to-t from-black/80 via-black/50 to-transparent"
+        >
+            <h3 class="text-white font-semibold text-lg">{title}</h3>
+
+            <p class="text-white/80 text-sm mt-1 line-clamp-2">
+                {description}
+            </p>
+
+            {
+                tags.length > 0 && (
+                    <div class="flex flex-wrap gap-2 mt-2">
+                        {tags.map((tag) => (
+                            <span class="text-xs bg-white/10 text-white px-2 py-0.5 rounded">
+                                #{tag}
+                            </span>
+                        ))}
+                    </div>
+                )
+            }
+        </div>
+    </div>
+    <script>
+        document.querySelectorAll("video").forEach((v) => {
+            v.addEventListener("mouseenter", () => v.play());
+            v.addEventListener("mouseleave", () => v.pause());
+        });
+    </script>
+</a>
