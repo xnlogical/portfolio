@@ -5,6 +5,7 @@ import { NAV_LINKS } from "../config";
 
 const { navbarActiveItemID } = Astro.props;
 const activeClasses = ["text-accent", "font-semibold"];
+const base = import.meta.env.BASE_URL;
 ---
 
 <header id="main-header" class="px-2 md:px-6 py-4 relative z-50">
@@ -40,9 +41,7 @@ const activeClasses = ["text-accent", "font-semibold"];
                         NAV_LINKS.map((link) => {
                             return (
                                 <a
-                                    href={
-                                        link.redirect ? link.redirect : link.url
-                                    }
+                                    href={base + (link.redirect ?? link.url)}
                                     target={link.redirect ? "_blank" : "_self"}
                                     id={link.id}
                                     class:list={[
